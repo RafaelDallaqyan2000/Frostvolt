@@ -29,8 +29,11 @@ var hp := C.HEALTH
 var max_hp := C.HEALTH
 var stop := 0
 var kills := 0
+var gold := 0
 var skipped := 0
 var elapsed := 0.0
+var energy := C.ENERGY_START
+var rapid_left := 0.0
 var hit_flash := 0.0
 var clock := 0.0
 var field_right := C.VIEW_WIDTH
@@ -110,8 +113,11 @@ func reset_run() -> void:
  returning = null
  stop = 0
  kills = 0
+ gold = 0
  skipped = 0
  elapsed = 0
+ energy = C.ENERGY_START
+ rapid_left = 0
  hit_flash = 0
  grid.place_piece("1x1", C.START_BLOCK)
  grid.place_weapon(C.START_WEAPON, C.START_BLOCK)
@@ -214,6 +220,8 @@ func advance(dt: float) -> void:
  if state != State.COMBAT: return
  # The only place where combat time moves; building, pause and menus leave all of it untouched.
  elapsed += dt
+ energy = minf(C.ENERGY_MAX, energy + C.ENERGY_RATE * dt)
+ rapid_left = maxf(0, rapid_left - dt)
  hit_flash = maxf(0, hit_flash - dt)
  var segment_done: bool = route.step(dt, self)
  combat.step(dt, self)
@@ -223,6 +231,7 @@ func advance(dt: float) -> void:
   var enemy = enemies[i]
   if enemy.hp <= 0:
    kills += 1
+   gold += int(enemy.stats.get("gold", 0))
    add_effect("burst", enemy.pos, enemy.pos, enemy.stats.color, 0.45, enemy.stats.size)
    enemies.remove_at(i)
  for i in range(effects.size() - 1, -1, -1):
@@ -232,6 +241,41 @@ func advance(dt: float) -> void:
  if hp <= 0: finish(false)
  elif boss != null and boss.hp <= 0: finish(true)
  elif segment_done: open_stop(route.stage)
+
+func ability(index: int) -> Dictionary:
+ return C.ABILITIES[index] if index >= 0 and index < C.ABILITIES.size() else {}
+
+func can_use(index: int) -> bool:
+ var card := ability(index)
+ return state == State.COMBAT and not card.is_empty() and energy >= card.cost
+
+# Ability cards spend energy earned during the battle; they never fire while building or paused.
+func use_ability(index: int) -> bool:
+ if not can_use(index): return false
+ var card := ability(index)
+ energy -= card.cost
+ match card.id:
+  "grenade":
+   var target = null
+   for enemy in enemies:
+    if enemy.hp > 0 and enemy.pos.x <= field_right and (target == null or enemy.pos.x < target.pos.x): target = enemy
+   if target == null:
+    energy += card.cost
+    return false
+   for enemy in enemies:
+    if enemy.hp > 0 and enemy.pos.distance_to(target.pos) <= card.radius: enemy.hit(card.damage)
+   add_effect("ice", target.pos, target.pos, Color("ffb03a"), 0.5, card.radius)
+   play("hit")
+  "burst":
+   for enemy in enemies:
+    if enemy.hp > 0 and enemy.pos.x <= field_right:
+     enemy.hit(card.damage)
+     add_effect("burst", enemy.pos, enemy.pos, Color("ff8a3a"), 0.4, enemy.stats.size)
+   play("hit")
+  "rapid":
+   rapid_left = card.seconds
+   play("upgrade")
+ return true
 
 func damage_fortress(amount: float, point: Vector2) -> void:
  if state != State.COMBAT: return

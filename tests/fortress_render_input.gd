@@ -69,9 +69,9 @@ func drag_end(to: Vector2, touch: bool) -> void:
  await process_frame
  await process_frame
 
-func tap(prefix: String, touch: bool = false) -> void:
+func tap(prefix: String, touch: bool = false, by_name: bool = false) -> void:
  await process_frame
- var matches = buttons(game.ui).filter(func(b): return b.text.begins_with(prefix))
+ var matches = buttons(game.ui).filter(func(b): return str(b.name).begins_with(prefix) if by_name else b.text.begins_with(prefix))
  check(matches.size() == 1, "Unique button " + prefix)
  if matches.size() != 1: return
  var point: Vector2 = matches[0].get_global_rect().get_center()
@@ -236,7 +236,7 @@ func run() -> void:
   check(fired, "Every installed weapon fires " + aspect)
   await capture("fortress-combat-" + aspect)
   await check_layout("combat " + aspect)
-  await tap("II")
+  await tap("PauseButton", false, true)
   check(game.state == Game.State.PAUSED, "Pause button " + aspect)
   await capture("fortress-pause-" + aspect)
   await tap("Продолжить")
