@@ -148,6 +148,11 @@ func show_menu() -> void:
  caption.offset_right = 300
  caption.offset_top = 150
  surface.add_child(caption)
+ var modes = button("← Бастион", game.to_modes)
+ modes.tooltip_text = "Новый режим: Кочевой бастион"
+ modes.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+ modes.offset_left = -200
+ surface.add_child(modes)
  var footer = column(14)
  footer.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
  footer.grow_vertical = Control.GROW_DIRECTION_BEGIN

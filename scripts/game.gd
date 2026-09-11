@@ -9,6 +9,8 @@ const Save = preload("res://scripts/save.gd")
 const Interface = preload("res://scripts/interface.gd")
 const Sound = preload("res://scripts/sound.gd")
 const Arena = preload("res://scripts/arena.gd")
+# The fortress mode is now the main entry; the classic arena is launched from its menu.
+const MODES_SCENE = "res://fortress.tscn"
 enum State { MENU, RUNNING, UPGRADE, PAUSED, GAME_OVER, VICTORY }
 var state := State.MENU
 var tower = Tower.new()
@@ -175,6 +177,11 @@ func to_menu() -> void:
  boss = null
  ui.show_menu()
 
+func to_modes() -> void:
+ save_records()
+ sound.stop_all()
+ get_tree().change_scene_to_file(MODES_SCENE)
+
 func finish(won: bool) -> void:
  if state != State.RUNNING: return
  state = State.VICTORY if won else State.GAME_OVER
@@ -215,7 +222,7 @@ func _notification(what: int) -> void:
  elif what == NOTIFICATION_WM_GO_BACK_REQUEST:
   if state == State.RUNNING: pause_run()
   elif state == State.PAUSED: resume_run()
-  elif state == State.MENU: get_tree().quit()
+  elif state == State.MENU: to_modes()
  elif what == NOTIFICATION_WM_CLOSE_REQUEST:
   if ui != null and state != State.MENU: save_records()
   get_tree().quit()
