@@ -75,6 +75,7 @@ func run() -> void:
   check(game.state == Game.State.RUNNING, "Menu to combat click")
   game.rng.seed = 10
   for i in range(27 * 60): game.advance(1.0 / 60)
+  game.ui.notice.hide()
   await capture("combat-" + aspect)
   await click_button("II")
   check(game.state == Game.State.PAUSED, "Pause button")
@@ -102,7 +103,9 @@ func run() -> void:
   game.weapons.cryo_explode(game, game.center + Vector2(-120, -145))
   game.weapons.fire_tesla(game, game.boss)
   for effect in game.effects: effect.left *= 0.65
-  for enemy in game.enemies: enemy.flash = 0
+  for enemy in game.enemies:
+   enemy.flash = 0
+   enemy.age = 1.0
   game.ui.show_hud()
   await capture("combo-" + aspect)
   game.boss.hp = 0

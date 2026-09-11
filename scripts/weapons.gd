@@ -3,6 +3,7 @@ const B = preload("res://scripts/balance.gd")
 var cooldowns := {"mg": 0.0, "cryo": 0.0, "tesla": 0.0}
 var projectiles: Array = []
 var last_aim := Vector2.UP
+var kick := 0.0
 
 func nearest(enemies: Array, origin: Vector2, radius: float, excluded: Array = []):
  var target = null
@@ -16,6 +17,7 @@ func nearest(enemies: Array, origin: Vector2, radius: float, excluded: Array = [
  return target
 
 func step(dt: float, game) -> void:
+ kick = maxf(0, kick - dt * 14)
  var tower = game.tower
  for key in cooldowns: cooldowns[key] = maxf(0, cooldowns[key] - dt)
  var mg_target = nearest(game.enemies, game.center, B.MG.range * (1 + 0.1 * tower.level("range")))
@@ -24,7 +26,9 @@ func step(dt: float, game) -> void:
   if cooldowns.mg <= 0:
    cooldowns.mg = 1.0 / (B.MG.rate * (1 + 0.15 * tower.level("rate")))
    mg_target.hit(B.MG.damage * (1 + 0.2 * tower.level("damage")))
-   game.add_effect("shot", game.center + last_aim * 35, mg_target.pos, Color("f9db8b"), 0.09)
+   kick = 1.0
+   game.add_effect("shot", game.center + last_aim * 74, mg_target.pos, Color("f9db8b"), 0.09)
+   game.add_effect("muzzle", game.center + last_aim * 74, mg_target.pos, Color("ffe7a1"), 0.09)
    game.add_effect("hit", mg_target.pos, mg_target.pos, Color("ffd9a5"), 0.16)
    game.sound.play_sound("shot")
  if tower.level("cryo") > 0 and cooldowns.cryo <= 0:
@@ -54,6 +58,7 @@ func cryo_explode(game, position: Vector2) -> void:
    enemy.hit(damage)
    enemy.slow = maxf(enemy.slow, duration)
  game.add_effect("ice", position, position, Color("6fe0ff"), 0.5, B.CRYO.radius)
+ game.impact_shake = maxf(game.impact_shake, 0.24)
  game.sound.play_sound("hit")
 
 func fire_tesla(game, first) -> Array:

@@ -17,6 +17,7 @@ var notice: Label
 var safe := Vector4(28, 30, 28, 30)
 
 func _ready() -> void:
+ z_index = 100
  set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
  mouse_filter = Control.MOUSE_FILTER_IGNORE
  var ui_theme := Theme.new()
@@ -88,7 +89,10 @@ func clear_screen(dim: bool = false) -> void:
  add_child(surface)
  set_surface_margins()
  surface.modulate.a = 0
- create_tween().tween_property(surface, "modulate:a", 1.0, 0.2)
+ surface.position.y += 14
+ var entrance = surface.create_tween().set_parallel(true)
+ entrance.tween_property(surface, "modulate:a", 1.0, 0.22)
+ entrance.tween_property(surface, "position:y", safe.y, 0.28).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 func label(text: String, font_size: int = 24, color: Color = TEXT) -> Label:
  var item := Label.new()
@@ -122,7 +126,20 @@ func button(text: String, action: Callable, primary: bool = false) -> Button:
   item.add_theme_color_override("font_hover_color", Color("10271f"))
   item.add_theme_color_override("font_pressed_color", Color("10271f"))
  item.pressed.connect(action)
+ item.button_down.connect(func(): animate_button(item, 0.97))
+ item.button_up.connect(func(): animate_button(item, 1.0))
+ item.mouse_entered.connect(func(): animate_button(item, 1.012))
+ item.mouse_exited.connect(func(): animate_button(item, 1.0))
  return item
+
+func animate_button(item: Button, target: float) -> void:
+ if item.has_meta("scale_tween"):
+  var previous = item.get_meta("scale_tween")
+  if previous.is_valid(): previous.kill()
+ item.pivot_offset = item.size * 0.5
+ var tween = item.create_tween()
+ item.set_meta("scale_tween", tween)
+ tween.tween_property(item, "scale", Vector2.ONE * target, 0.14).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 func meter(color: Color, height: int = 10) -> ProgressBar:
  var bar := ProgressBar.new()
@@ -204,7 +221,7 @@ func show_hud() -> void:
  stats.add_child(kills_label)
  time_label = label("", 26, MINT)
  stats.add_child(time_label)
- boss_label = label("НОСИТЕЛЬ / ЯДРО УЛЬЯ", 18, Color("ff7fa0"))
+ boss_label = label("МАТКА УЛЬЯ / НОСИТЕЛЬ", 18, Color("ff7fa0"))
  top.add_child(boss_label)
  boss_bar = meter(Color("ff628c"), 9)
  top.add_child(boss_bar)
@@ -276,6 +293,10 @@ func show_upgrades(cards: Array, unlock: String) -> void:
   card.name = "Card_" + id
   card.custom_minimum_size.y = 162
   body.add_child(card)
+  card.modulate.a = 0
+  var reveal = card.create_tween()
+  reveal.tween_interval(cards.find(id) * 0.065)
+  reveal.tween_property(card, "modulate:a", 1.0, 0.20)
   var margin := MarginContainer.new()
   margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
   for side in ["left", "right"]: margin.add_theme_constant_override("margin_" + side, 22)
