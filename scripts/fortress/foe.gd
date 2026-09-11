@@ -14,6 +14,8 @@ var flash := 0.0
 var attack := 0.0
 var phase := 0.0
 var warn := 0.0
+# Throttles the floating damage numbers so a burst of hits stays readable.
+var number_cd := 0.0
 var velocity := Vector2.ZERO
 
 func _init(type: String, position: Vector2, target: Vector2, growth: float = 1.0) -> void:
@@ -29,6 +31,7 @@ func _init(type: String, position: Vector2, target: Vector2, growth: float = 1.0
 func step(dt: float, game) -> void:
  slow = maxf(0, slow - dt)
  flash = maxf(0, flash - dt)
+ number_cd = maxf(0, number_cd - dt)
  var speed: float = stats.speed * (stats.get("slow_factor", C.WEAPONS.cryo.factor) if slow > 0 else 1.0)
  if not engaged:
   phase += dt * speed / 14.0

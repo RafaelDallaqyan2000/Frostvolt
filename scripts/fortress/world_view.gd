@@ -33,93 +33,89 @@ func _draw() -> void:
  for effect in game.ui_effects: draw_puff(effect)
 
 func draw_sky(view: Rect2, t: float) -> void:
- var top := Color("060d19")
- var horizon := Color("143044")
- draw_polygon(PackedVector2Array([view.position, Vector2(view.end.x, view.position.y), Vector2(view.end.x, 0), Vector2(view.position.x, 0)]), PackedColorArray([top, top, horizon, horizon]))
- for i in range(70):
-  var p := Vector2(view.position.x + hash01(i * 3 + 1) * view.size.x, view.position.y + hash01(i * 3 + 2) * (-260 - view.position.y))
-  var a := 0.2 + 0.35 * (0.5 + 0.5 * sin(t * (1.0 + hash01(i) * 2.0) + i))
-  draw_circle(p, 1.0 + hash01(i * 7) * 1.4, Color(0.8, 0.95, 1.0, a))
- var sun := Vector2(view.end.x - 150, -C.TOWER_EXTENT + 70)
- for i in range(6, 0, -1): draw_circle(sun, 30 + i * 16, Color(0.35, 0.6, 0.7, 0.025))
- draw_circle(sun, 34, Color("24424f"))
- draw_circle(sun, 26, Color("375f6d"))
- for band in range(3):
-  var points := PackedVector2Array()
-  var x := view.position.x - 20
-  while x <= view.end.x + 40:
-   points.append(Vector2(x, -560 + band * 44 + sin(x * 0.006 + t * 0.25 + band * 1.7) * 34 + sin(x * 0.017 - t * 0.4) * 10))
-   x += 40
-  draw_polyline(points, Color(0.3, 0.95, 0.75, 0.045), 30, true)
-  draw_polyline(points, Color(0.45, 1.0, 0.82, 0.08), 5, true)
+ draw_polygon(PackedVector2Array([view.position, Vector2(view.end.x, view.position.y), Vector2(view.end.x, 0), Vector2(view.position.x, 0)]), PackedColorArray([Art.SKY_HIGH, Art.SKY_HIGH, Art.SKY_LOW, Art.SKY_LOW]))
+ # Hazy sun behind the dust.
+ var sun := Vector2(view.end.x - 170, -C.TOWER_EXTENT + 90)
+ for i in range(7, 0, -1): draw_circle(sun, 26 + i * 20, Color(1, 0.92, 0.76, 0.028))
+ draw_circle(sun, 40, Color(1, 0.95, 0.82, 0.3))
+ # Slow dust drifting across the wasteland.
+ for i in range(46):
+  var drift := fposmod(hash01(i * 5 + 3) * view.size.x - t * (6.0 + hash01(i) * 14.0), view.size.x + 60.0)
+  var p := Vector2(view.position.x - 30 + drift, -60 - hash01(i * 3 + 2) * (C.TOWER_EXTENT - 40))
+  draw_circle(p, 1.4 + hash01(i * 7) * 2.6, Color(0.98, 0.9, 0.78, 0.06 + 0.06 * hash01(i * 11)))
 
+# Distant city blocks: flat silhouettes, lighter with depth.
 func draw_ranges(view: Rect2, s: float) -> void:
- for layer in [[0.08, 170.0, 66.0, Color("101e30"), Color("223a52")], [0.2, 100.0, 48.0, Color("0c1726"), Color("1a2d40")]]:
+ for layer in [[0.08, 250.0, 84.0, Art.CITY_FAR], [0.2, 190.0, 62.0, Art.CITY_MID]]:
   var offset: float = s * layer[0]
   var step: float = layer[2]
+  var fill: Color = layer[3]
   var x := floorf((view.position.x + offset) / step) * step - offset
-  var ridge := PackedVector2Array()
   while x <= view.end.x + step:
    var n := int(roundf((x + offset) / step))
-   ridge.append(Vector2(x, -layer[1] * (0.4 + 0.6 * hash01(n + int(layer[1])))))
+   var w: float = step * (0.62 + 0.32 * hash01(n * 3 + 1))
+   var h: float = layer[1] * (0.34 + 0.66 * hash01(n * 7 + 2))
+   draw_rect(Rect2(x, -h, w, h), fill)
+   draw_rect(Rect2(x, -h, w, 5), fill.lightened(0.12))
+   if hash01(n * 13 + 5) > 0.72: draw_rect(Rect2(x + w * 0.35, -h - 26, 7, 26), fill)
    x += step
-  var shape := ridge.duplicate()
-  shape.append(Vector2(ridge[ridge.size() - 1].x, 0))
-  shape.append(Vector2(ridge[0].x, 0))
-  draw_colored_polygon(shape, layer[3])
-  draw_polyline(ridge, layer[4], 2, true)
+ # Haze washes the far city out toward the horizon.
+ draw_polygon(PackedVector2Array([Vector2(view.position.x, -230), Vector2(view.end.x, -230), Vector2(view.end.x, 0), Vector2(view.position.x, 0)]), PackedColorArray([Color(Art.SKY_LOW, 0.0), Color(Art.SKY_LOW, 0.0), Color(Art.SKY_LOW, 0.55), Color(Art.SKY_LOW, 0.55)]))
 
 func draw_ruins(view: Rect2, s: float, t: float) -> void:
  var offset := s * 0.45
  var spacing := 330.0
- var dark := Color("0b1622")
- var line := Color("132536")
+ var fill := Art.CITY_NEAR
+ var dark := fill.darkened(0.25)
  for n in range(int(floorf((view.position.x + offset) / spacing)) - 1, int(ceilf((view.end.x + offset) / spacing)) + 1):
   var x := n * spacing - offset + hash01(n * 5 + 3) * 120.0
-  var h := 170.0 + hash01(n) * 80.0
-  match int(hash01(n * 5 + 11) * 4.0):
+  var h := 200.0 + hash01(n) * 110.0
+  match int(hash01(n * 5 + 11) * 3.0):
    0:
-    for side in [-1.0, 1.0]: draw_line(Vector2(x + side * 26, 0), Vector2(x + side * 6, -h), line, 4)
-    var y := -30.0
-    while y > -h + 20:
-     var w := lerpf(26, 6, -y / h)
-     draw_line(Vector2(x - w, y), Vector2(x + w * 0.8, y - 26), line, 2)
-     y -= 30.0
-    draw_line(Vector2(x - 42, -h + 30), Vector2(x + 42, -h + 30), line, 4)
-    if fmod(t + n * 0.37, 2.2) < 0.35: draw_circle(Vector2(x, -h - 4), 3.5, Color(1, 0.35, 0.3, 0.8))
+    # Gutted tower block with broken windows.
+    var w := 108.0
+    draw_rect(Rect2(x - w * 0.5, -h, w, h), fill)
+    draw_rect(Rect2(x - w * 0.5, -h, w, 6), fill.lightened(0.15))
+    for row in range(int(h / 42.0)):
+     for col in range(3):
+      if hash01(n * 61 + row * 7 + col) > 0.38:
+       draw_rect(Rect2(x - w * 0.5 + 14 + col * 28, -h + 18 + row * 42, 16, 22), dark)
    1:
-    var body := PackedVector2Array([Vector2(x - 70, 0), Vector2(x - 48, -80), Vector2(x - 44, -130), Vector2(x - 52, -170), Vector2(x + 36, -170), Vector2(x + 46, -150), Vector2(x + 52, -170), Vector2(x + 44, -130), Vector2(x + 48, -80), Vector2(x + 70, 0)])
-    draw_colored_polygon(body, dark)
+    # Cooling stack with smoke.
+    draw_colored_polygon(PackedVector2Array([Vector2(x - 62, 0), Vector2(x - 42, -110), Vector2(x - 38, -h), Vector2(x + 38, -h), Vector2(x + 42, -110), Vector2(x + 62, 0)]), fill)
+    draw_rect(Rect2(x - 38, -h, 76, 7), fill.lightened(0.15))
     for i in range(3):
-     var k := fposmod(t * 0.08 + i / 3.0, 1.0)
-     draw_circle(Vector2(x - 10 + k * 40, -180 - k * 90), 18 + k * 30, Color(0.6, 0.75, 0.8, 0.035 * (1.0 - k)))
+     var k := fposmod(t * 0.07 + i / 3.0, 1.0)
+     draw_circle(Vector2(x - 12 + k * 46, -h - 20 - k * 110), 20 + k * 34, Color(0.86, 0.82, 0.76, 0.1 * (1.0 - k)))
    2:
-    draw_line(Vector2(x, 0), Vector2(x, -h), line, 3)
-    for side in [-1.0, 1.0]: draw_line(Vector2(x, -h * 0.7), Vector2(x + side * 50, 0), Color(line, 0.6), 1)
-    draw_arc(Vector2(x + 8, -h + 10), 18, -PI * 0.2, PI * 0.8, 10, line, 3)
-    if fmod(t * 0.9 + n * 0.21, 1.8) < 0.3: draw_circle(Vector2(x, -h - 3), 3, Color(1, 0.75, 0.3, 0.8))
+    # Dockside crane over the rubble.
+    draw_rect(Rect2(x - 8, -h, 16, h), fill)
+    draw_rect(Rect2(x - 70, -h - 14, 150, 14), fill)
+    draw_line(Vector2(x + 62, -h), Vector2(x + 62, -h + 54), dark, 4)
+    draw_rect(Rect2(x + 50, -h + 54, 24, 20), dark)
+    if fmod(t * 0.9 + n * 0.21, 1.8) < 0.35: draw_circle(Vector2(x, -h - 22), 4, Color(1, 0.4, 0.28, 0.9))
 
 func draw_ground(view: Rect2, s: float) -> void:
  var left := view.position.x - 10
  var width := view.size.x + 20
- draw_rect(Rect2(left, 0, width, 24), Color("1a2935"))
- draw_rect(Rect2(left, 24, width, 40), Color("121f2a"))
- draw_rect(Rect2(left, 64, width, 120), Color("0e1822"))
- draw_rect(Rect2(left, 184, width, view.end.y - 174), Color("0a121b"))
- draw_line(Vector2(left, 0), Vector2(left + width, 0), Color("3f5c68"), 3)
+ draw_rect(Rect2(left, 0, width, 26), Art.ROAD)
+ draw_rect(Rect2(left, 26, width, 46), Art.ROAD_DARK)
+ draw_rect(Rect2(left, 72, width, 130), Art.SOIL)
+ draw_rect(Rect2(left, 202, width, view.end.y - 192), Art.SOIL.darkened(0.3))
+ draw_line(Vector2(left, 0), Vector2(left + width, 0), Color("c47a53"), 3)
  var step := 120.0
  var x := floorf((left + s) / step) * step - s
  while x < left + width:
   var n := int(roundf((x + s) / step))
-  draw_rect(Rect2(x, 9, 44, 4), Color("2e4552"))
-  draw_circle(Vector2(x + 70, 1), 9 + hash01(n) * 8, Color(0.75, 0.9, 0.97, 0.1))
-  if hash01(n * 3 + 1) > 0.5:
-   var p := Vector2(x + hash01(n * 7) * step, 40 + hash01(n * 11) * 110)
-   draw_colored_polygon(PackedVector2Array([p + Vector2(-7, 4), p + Vector2(0, -9), p + Vector2(8, 3), p + Vector2(0, 7)]), Color(0.45, 0.85, 1, 0.22))
+  draw_rect(Rect2(x, 10, 44, 5), Art.ROAD.darkened(0.22))
+  # Rubble scattered along the roadside.
+  for i in range(2):
+   var r := 2.0 + hash01(n * 17 + i * 5) * 4.0
+   draw_circle(Vector2(x + hash01(n * 7 + i) * step, -r * 0.4), r, Art.ROAD_DARK.lightened(0.08))
   if posmod(n, 3) == 0:
-   draw_rect(Rect2(x, 96, step * 0.8, 10), Color("16242f"))
-   draw_rect(Rect2(x - 3, 93, 8, 16), Color("22343f"))
-  if hash01(n * 13 + 5) > 0.7: draw_line(Vector2(x + 20, 150 + hash01(n) * 30), Vector2(x + 90, 160 + hash01(n + 1) * 30), Color(0.47, 0.94, 0.8, 0.08), 2)
+   draw_rect(Rect2(x, 104, step * 0.8, 11), Art.SOIL.lightened(0.12))
+   draw_rect(Rect2(x - 3, 100, 8, 18), Art.SOIL.lightened(0.2))
+  if hash01(n * 13 + 5) > 0.7: draw_line(Vector2(x + 20, 160 + hash01(n) * 30), Vector2(x + 90, 170 + hash01(n + 1) * 30), Color(0.78, 0.5, 0.36, 0.25), 2)
   x += step
  # Roadside posts count the same metres as the route bar.
  var post := 600.0
@@ -128,10 +124,10 @@ func draw_ground(view: Rect2, s: float) -> void:
   var index := int(roundf((x + s) / post))
   if index > 0:
    var p := Vector2(x + 40, 0)
-   draw_rect(Rect2(p + Vector2(-2, -64), Vector2(4, 64)), Color("2a3a44"))
-   draw_rect(Rect2(p + Vector2(-26, -86), Vector2(52, 24)), Color("1d2e39"))
-   draw_rect(Rect2(p + Vector2(-26, -86), Vector2(52, 24)), Color(0.47, 0.94, 0.8, 0.35), false, 1.5)
-   draw_string(ThemeDB.fallback_font, p + Vector2(-26, -68), "%d м" % int(index * post / C.UNITS_PER_METER), HORIZONTAL_ALIGNMENT_CENTER, 52, 14, Color(0.7, 0.9, 0.85, 0.8))
+   draw_rect(Rect2(p + Vector2(-2, -64), Vector2(4, 64)), Color("6b5348"))
+   draw_rect(Rect2(p + Vector2(-26, -86), Vector2(52, 24)), Color("e8d6b6"))
+   draw_rect(Rect2(p + Vector2(-26, -86), Vector2(52, 24)), Color("8d6a4f"), false, 2)
+   draw_string(ThemeDB.fallback_font, p + Vector2(-26, -68), "%d м" % int(index * post / C.UNITS_PER_METER), HORIZONTAL_ALIGNMENT_CENTER, 52, 14, Color("6d4636"))
   x += post
 
 func draw_chassis(s: float, t: float) -> void:
@@ -149,51 +145,51 @@ func draw_chassis(s: float, t: float) -> void:
  draw_sprocket(Vector2(40, -31), 21, s)
  draw_sprocket(Vector2(330, -31), 21, s)
  var hull := PackedVector2Array([Vector2(12, -60), Vector2(346, -60), Vector2(370, -82), Vector2(354, -112), Vector2(26, -112), Vector2(8, -94)])
- draw_colored_polygon(hull, Color("1c2e3b"))
- draw_colored_polygon(PackedVector2Array([Vector2(26, -112), Vector2(354, -112), Vector2(361, -101), Vector2(19, -101)]), Color("2c4758"))
- for x in [104.0, 264.0]: draw_line(Vector2(x, -100), Vector2(x, -62), Color("132230"), 2)
- for i in range(14): draw_circle(Vector2(26 + i * 24, -67), 2, Color("5f808a"))
+ draw_colored_polygon(hull, Color("8f4736"))
+ draw_colored_polygon(PackedVector2Array([Vector2(26, -112), Vector2(354, -112), Vector2(361, -101), Vector2(19, -101)]), Color("b5613f"))
+ for x in [104.0, 264.0]: draw_line(Vector2(x, -100), Vector2(x, -62), Color("6b3327"), 2)
+ for i in range(14): draw_circle(Vector2(26 + i * 24, -67), 2, Color("d99a6c"))
  for i in range(4):
   var a := Vector2(348 + i * 5.5, -62 - i * 5)
   draw_colored_polygon(PackedVector2Array([a, a + Vector2(5, -4.5), a + Vector2(-3, -12), a + Vector2(-8, -7.5)]), Color("e8b04a") if i % 2 == 0 else Color("1a1a1a"))
  draw_polyline(Art.closed(hull), Art.EDGE, 3, true)
- draw_rect(Rect2(20, -118, 336, 6), Color("3a5566"))
- draw_line(Vector2(20, -118), Vector2(356, -118), Color("5d8290"), 2)
+ draw_rect(Rect2(20, -118, 336, 6), Color("e8d6b6"))
+ draw_line(Vector2(20, -118), Vector2(356, -118), Color("a98a63"), 2)
  draw_reactor(C.REACTOR, t)
  var lamp := Vector2(368, -86)
  draw_colored_polygon(PackedVector2Array([lamp + Vector2(0, -4), lamp + Vector2(210, 60), lamp + Vector2(210, 86), lamp + Vector2(0, 5)]), Color(1, 0.9, 0.6, 0.045))
  draw_circle(lamp, 5, Color("ffe7a8"))
- draw_rect(Rect2(14, -136, 10, 24), Color("2a3f4c"))
+ draw_rect(Rect2(14, -136, 10, 24), Color("6b3327"))
  for i in range(3):
   var k := fposmod(t * 0.7 + i / 3.0, 1.0)
-  draw_circle(Vector2(19 - k * 30, -140 - k * 60), 6 + k * 14, Color(0.7, 0.8, 0.85, 0.08 * (1.0 - k)))
+  draw_circle(Vector2(19 - k * 30, -140 - k * 60), 6 + k * 14, Color(0.55, 0.48, 0.42, 0.1 * (1.0 - k)))
 
 func draw_wheel(p: Vector2, r: float, s: float) -> void:
- draw_circle(p, r, Color("1e2b34"))
- draw_arc(p, r, 0, TAU, 20, Color("4b6570"), 2.5, true)
- for i in range(3): draw_line(p, p + Vector2.from_angle(s / r + i * TAU / 3) * (r - 3), Color("5d7a84"), 2.5)
- draw_circle(p, 4.5, Color("8fb0b6"))
+ draw_circle(p, r, Color("3a2119"))
+ draw_circle(p, r - 3, Art.RUST)
+ for i in range(3): draw_line(p, p + Vector2.from_angle(s / r + i * TAU / 3) * (r - 5), Color("a8401b"), 3)
+ draw_circle(p, 4.5, Color("f2b06a"))
 
 func draw_sprocket(p: Vector2, r: float, s: float) -> void:
  var a := s / r
- for i in range(8): draw_colored_polygon(Art.quad(p, a + i * TAU / 8, 1.0, Rect2(r - 4, -3, 7, 6)), Color("3a505b"))
- draw_circle(p, r - 2, Color("22323c"))
- draw_arc(p, r - 2, 0, TAU, 24, Color("56727c"), 2, true)
- for i in range(4): draw_line(p, p + Vector2.from_angle(a + i * PI / 2) * (r - 6), Color("4a646e"), 3)
- draw_circle(p, 6, Color("8fb0b6"))
+ for i in range(8): draw_colored_polygon(Art.quad(p, a + i * TAU / 8, 1.0, Rect2(r - 4, -3, 7, 6)), Color("5c3226"))
+ draw_circle(p, r - 2, Color("3a2119"))
+ draw_circle(p, r - 5, Art.RUST)
+ for i in range(4): draw_line(p, p + Vector2.from_angle(a + i * PI / 2) * (r - 7), Color("a8401b"), 3)
+ draw_circle(p, 6, Color("f2b06a"))
 
 # The old arena reactor, set into the hull as the base of the fortress.
 func draw_reactor(p: Vector2, t: float) -> void:
  var shell := Art.ring(p, 27, 27, 6, PI / 6)
- draw_colored_polygon(shell, Color("152633"))
- draw_polyline(Art.closed(shell), Color("31564f"), 2.5, true)
+ draw_colored_polygon(shell, Color("4a2419"))
+ draw_polyline(Art.closed(shell), Color("8a5a3a"), 2.5, true)
  var pulse := 0.7 + 0.3 * sin(t * 2.2)
- for i in range(4, 0, -1): draw_circle(p, 14 + i * 5, Color(0.27, 1.0, 0.69, 0.05 * pulse))
- draw_colored_polygon(Art.ring(p, 19, 19, 6, PI / 6), Color("337e68"))
- draw_colored_polygon(Art.ring(p, 13, 13, 6, PI / 6), MINT)
- draw_colored_polygon(Art.ring(p, 6, 6, 6, PI / 6), Color("ddfff0"))
- draw_arc(p, 23, t * 0.5, t * 0.5 + PI * 1.5, 32, Color("418f7a"), 2, true)
- for dx in [-70.0, 70.0]: draw_line(p + Vector2(dx * 0.35, -12), Vector2(p.x + dx, -112), Color(0.47, 0.94, 0.8, 0.3 + 0.2 * pulse), 2)
+ for i in range(4, 0, -1): draw_circle(p, 14 + i * 5, Color(1.0, 0.62, 0.2, 0.06 * pulse))
+ draw_colored_polygon(Art.ring(p, 19, 19, 6, PI / 6), Color("b5551f"))
+ draw_colored_polygon(Art.ring(p, 13, 13, 6, PI / 6), Color("f0932b"))
+ draw_colored_polygon(Art.ring(p, 6, 6, 6, PI / 6), Color("ffe4a8"))
+ draw_arc(p, 23, t * 0.5, t * 0.5 + PI * 1.5, 32, Color("d97a2b"), 2, true)
+ for dx in [-70.0, 70.0]: draw_line(p + Vector2(dx * 0.35, -12), Vector2(p.x + dx, -112), Color(0.95, 0.6, 0.25, 0.3 + 0.2 * pulse), 2)
 
 func draw_tower(t: float) -> void:
  var grid = game.grid
@@ -208,12 +204,51 @@ func draw_tower(t: float) -> void:
  for cell in grid.blocks:
   var rect := C.cell_rect(cell)
   if grid.blocks.get(cell + Vector2i(1, 0), grid.blocks[cell]) != grid.blocks[cell]:
-   draw_line(Vector2(rect.end.x, rect.position.y + 6), Vector2(rect.end.x, rect.end.y - 6), Color("6d949c"), 3)
-   for y in [0.3, 0.7]: draw_circle(Vector2(rect.end.x, rect.position.y + rect.size.y * y), 3.5, Color("9fbfc4"))
+   draw_line(Vector2(rect.end.x, rect.position.y + 6), Vector2(rect.end.x, rect.end.y - 6), Color("a98a63"), 3)
+   for y in [0.3, 0.7]: draw_circle(Vector2(rect.end.x, rect.position.y + rect.size.y * y), 3.5, Color("d9bf92"))
   if grid.blocks.get(cell + Vector2i(0, 1), grid.blocks[cell]) != grid.blocks[cell]:
-   draw_line(Vector2(rect.position.x + 6, rect.position.y), Vector2(rect.end.x - 6, rect.position.y), Color("6d949c"), 3)
-   for x in [0.3, 0.7]: draw_circle(Vector2(rect.position.x + rect.size.x * x, rect.position.y), 3.5, Color("9fbfc4"))
+   draw_line(Vector2(rect.position.x + 6, rect.position.y), Vector2(rect.end.x - 6, rect.position.y), Color("a98a63"), 3)
+   for x in [0.3, 0.7]: draw_circle(Vector2(rect.position.x + rect.size.x * x, rect.position.y), 3.5, Color("d9bf92"))
  for turret in game.turrets: Art.draw_turret(self, turret.kind, turret.pivot, turret.aim, t, turret.recoil)
+ draw_crew(t)
+
+# Highest crate, leftmost on its floor: where the builder stands and the crane is anchored.
+func top_cell() -> Vector2i:
+ var best: Vector2i = C.START_BLOCK
+ for cell in game.grid.blocks:
+  if cell.y > best.y or (cell.y == best.y and cell.x < best.x): best = cell
+ return best
+
+# The builder rides the top crate; the crane arm above him lifts the next one.
+func draw_crew(t: float) -> void:
+ var rect := C.cell_rect(top_cell())
+ var feet := Vector2(rect.get_center().x + 6, rect.position.y)
+ var bob := sin(t * 2.1) * 1.6
+ # Crane: mast, angled jib and a glowing lamp at the tip.
+ var mast := feet + Vector2(-26, -4)
+ var elbow := mast + Vector2(-6, -74)
+ var tip := elbow + Vector2(56, -34)
+ draw_line(mast, elbow, Color("a8402c"), 11)
+ draw_line(elbow, tip, Color("a8402c"), 9)
+ draw_line(mast, elbow, Color("d4593a"), 5)
+ draw_line(elbow, tip, Color("d4593a"), 4)
+ draw_circle(elbow, 6, Color("6d2718"))
+ var glow := 0.65 + 0.35 * sin(t * 3.4)
+ draw_circle(tip, 15, Color(1.0, 0.65, 0.2, 0.2 * glow))
+ draw_circle(tip, 8, Color("ffb03a"))
+ draw_circle(tip, 4, Color("fff0c4"))
+ # Builder: boots, coat, head under a wide hat, rifle resting toward the road.
+ var hip := feet + Vector2(0, -22 + bob)
+ draw_line(feet + Vector2(-5, 0), hip + Vector2(-3, 0), Color("3d2a1e"), 6)
+ draw_line(feet + Vector2(5, 0), hip + Vector2(3, 0), Color("3d2a1e"), 6)
+ draw_colored_polygon(PackedVector2Array([hip + Vector2(-9, 2), hip + Vector2(9, 2), hip + Vector2(7, -20), hip + Vector2(-7, -20)]), Color("6f9a4e"))
+ draw_line(hip + Vector2(-9, -6), hip + Vector2(9, -6), Color("4e7038"), 3)
+ var head := hip + Vector2(1, -28)
+ draw_circle(head, 8, Color("f0c193"))
+ draw_line(head + Vector2(-12, -4), head + Vector2(12, -4), Color("d8a860"), 5)
+ draw_colored_polygon(PackedVector2Array([head + Vector2(-8, -4), head + Vector2(8, -4), head + Vector2(6, -13), head + Vector2(-6, -13)]), Color("d8a860"))
+ draw_line(head + Vector2(6, 4), head + Vector2(26, 10), Color("4b3f39"), 5)
+ draw_line(head + Vector2(16, 7), head + Vector2(30, 9), Color("8a7a6d"), 3)
 
 func draw_grid_overlay(t: float) -> void:
  var area := C.grid_rect()
@@ -252,23 +287,25 @@ func draw_enemy(e, t: float) -> void:
   draw_rect(Rect2(top, Vector2(r * 2, 4)), Color("243343"))
   draw_rect(Rect2(top, Vector2(r * 2 * clampf(e.hp / e.max_hp, 0, 1), 4)), color)
 
+# Raider on foot: marches left toward the bastion, rifle forward.
 func draw_crawler(e, color: Color) -> void:
  var p: Vector2 = e.pos
  var r: float = e.stats.size
- for i in range(4):
-  var hip := p + Vector2(-r * 0.7 + i * r * 0.5, r * 0.3)
-  var swing: float = e.phase * 2.0 + i * PI * 0.5
-  var foot := Vector2(hip.x + sin(swing) * r * 0.35, -1 - maxf(0, -cos(swing)) * 5)
-  draw_polyline(PackedVector2Array([hip, hip.lerp(foot, 0.5) + Vector2(-4, -6), foot]), color.darkened(0.3), 2.5, true)
- var body := Art.ring(p, r * 1.3, r * 0.78, 18)
- draw_colored_polygon(body, color.darkened(0.6))
- for i in range(3): draw_arc(p + Vector2(-r * 0.2 + i * r * 0.35, 0), r * 0.62, -PI * 0.85, -PI * 0.15, 8, color.darkened(0.2), 1.6, true)
- draw_polyline(Art.closed(body), color, 2.2, true)
- var head := p + Vector2(-r * 1.25, -r * 0.05)
- draw_circle(head, r * 0.5, color.darkened(0.6))
- draw_arc(head, r * 0.5, 0, TAU, 14, color, 2, true)
- draw_circle(head + Vector2(-r * 0.2, -r * 0.1), r * 0.14, Color("ffe6d8"))
- draw_line(head + Vector2(-r * 0.4, r * 0.2), head + Vector2(-r * 0.75, r * 0.35 + sin(e.phase * 4.0) * 2), color, 2)
+ var dark := color.darkened(0.42)
+ var swing := sin(e.phase * 2.4)
+ for side in [-1.0, 1.0]:
+  var hip := p + Vector2(side * r * 0.22, r * 0.5)
+  draw_line(hip, Vector2(hip.x + swing * side * r * 0.55, -2), dark, 6)
+ var torso := Rect2(p + Vector2(-r * 0.52, -r * 0.55), Vector2(r * 1.04, r * 1.12))
+ draw_rect(torso, color)
+ draw_rect(Rect2(torso.position, Vector2(torso.size.x, r * 0.26)), color.lightened(0.16))
+ draw_rect(torso, Art.EDGE, false, 2.2)
+ draw_line(p + Vector2(-r * 0.45, r * 0.05), p + Vector2(-r * 1.15, r * 0.2 + swing * 2.0), dark, 5)
+ draw_rect(Rect2(p + Vector2(-r * 1.5, r * 0.05), Vector2(r * 0.5, r * 0.16)), Color("4b3f39"))
+ var head := p + Vector2(-r * 0.08, -r * 0.95)
+ draw_circle(head, r * 0.4, Color("f0c193"))
+ draw_colored_polygon(PackedVector2Array([head + Vector2(-r * 0.48, -r * 0.08), head + Vector2(r * 0.42, -r * 0.08), head + Vector2(r * 0.34, -r * 0.46), head + Vector2(-r * 0.4, -r * 0.46)]), dark)
+ draw_circle(head + Vector2(-r * 0.16, r * 0.04), r * 0.09, Color("3a241c"))
 
 func draw_hornet(e, color: Color) -> void:
  var p: Vector2 = e.pos + Vector2(0, sin(e.phase * 1.3) * 5)
@@ -371,6 +408,10 @@ func draw_effect(effect: Dictionary) -> void:
    draw_circle(p, effect.radius * progress, Color(color, alpha * 0.12))
    draw_arc(p, effect.radius * progress, 0, TAU, 48, color, 3, true)
   "conduct": draw_string(ThemeDB.fallback_font, p + Vector2(-22, -30 - 25 * progress), "+30%", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, color)
+  "damage":
+   var rise := p + Vector2(0, -34 * progress)
+   draw_string_outline(ThemeDB.fallback_font, rise, str(int(round(effect.radius))), HORIZONTAL_ALIGNMENT_CENTER, 80, 26, 6, Color(0.16, 0.09, 0.06, alpha))
+   draw_string(ThemeDB.fallback_font, rise, str(int(round(effect.radius))), HORIZONTAL_ALIGNMENT_CENTER, 80, 26, color)
   "spark":
    for i in range(5): draw_line(p, p + Vector2.from_angle(PI * 0.6 + i * 0.35) * (6 + progress * effect.radius * 1.6), color, 2, true)
   "summon": draw_arc(p, effect.radius * (0.4 + progress), 0, TAU, 40, color, 5, true)

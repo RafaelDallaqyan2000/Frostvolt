@@ -9,7 +9,7 @@ const GOLD = Color("ffd88a")
 var hud_root: Control
 var panel_root: Control
 var status_label: Label
-var status_sub: Label
+var gold_label: Label
 var hp_value: Label
 var hp_meter: ProgressBar
 var route_bar: Control
@@ -29,6 +29,8 @@ var go_button: Button
 var note := ""
 var note_until := 0.0
 var chips: Dictionary = {}
+var energy_label: Label
+var ability_cards: Array = []
 var kills_value: Label
 var clock_caption: Label
 var clock_value: Label
@@ -55,13 +57,18 @@ func _ready() -> void:
  super()
  theme.set_stylebox("disabled", "Button", box(Color("0d1722"), Color("1f2f3b"), 16))
  theme.set_color("font_disabled_color", "Button", Color("58707c"))
+ # Light type over a bright sky needs a dark stroke, like the reference art.
+ theme.set_constant("outline_size", "Label", 8)
+ theme.set_color("font_outline_color", "Label", Color("3a241c"))
+ theme.set_constant("outline_size", "Button", 6)
+ theme.set_color("font_outline_color", "Button", Color("3a241c"))
 
 func clear_screen(dim: bool = false) -> void:
  super(dim)
  hud_root = null
  panel_root = null
  status_label = null
- status_sub = null
+ gold_label = null
  hp_value = null
  hp_meter = null
  route_bar = null
@@ -80,6 +87,8 @@ func clear_screen(dim: bool = false) -> void:
  clock_value = null
  armour_value = null
  tip_label = null
+ energy_label = null
+ ability_cards.clear()
  chips.clear()
  cards.clear()
  built_for.clear()
@@ -99,7 +108,7 @@ func meter(color: Color, height: int = 10) -> ProgressBar:
 func strip(color: Color, top_edge: bool) -> StyleBoxFlat:
  var style := StyleBoxFlat.new()
  style.bg_color = color
- style.border_color = Color(0.47, 0.94, 0.8, 0.25)
+ style.border_color = Color(0.25, 0.15, 0.11, 0.35)
  if top_edge: style.border_width_top = 2
  else: style.border_width_bottom = 2
  return style
@@ -143,46 +152,62 @@ func show_menu() -> void:
 func build_top() -> void:
  var back := Panel.new()
  back.mouse_filter = Control.MOUSE_FILTER_IGNORE
- back.add_theme_stylebox_override("panel", strip(Color(0.03, 0.065, 0.11, 0.95), false))
+ back.add_theme_stylebox_override("panel", strip(Color(0.16, 0.10, 0.08, 0.22), false))
  back.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
  back.offset_left = -safe.x
  back.offset_right = safe.z
  back.offset_top = -safe.y
  back.offset_bottom = C.HUD_HEIGHT
  surface.add_child(back)
- var top = column(12)
+ var top = column(8)
  top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
  surface.add_child(top)
  hud_root = top
+ # Settings gear on the left, the level track filling the rest of the row.
  var row := HBoxContainer.new()
- row.custom_minimum_size.y = 68
+ row.add_theme_constant_override("separation", 14)
+ row.custom_minimum_size.y = 62
  top.add_child(row)
- var titles = column(0)
- titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
- titles.alignment = BoxContainer.ALIGNMENT_CENTER
- row.add_child(titles)
- status_label = label("", 18, MINT)
- titles.add_child(status_label)
- status_sub = label("", 25)
- titles.add_child(status_sub)
- var pause = button("II", game.pause_run)
- pause.tooltip_text = "Пауза (P / Esc)"
- pause.custom_minimum_size = Vector2(76, 68)
- row.add_child(pause)
- var hp_row := HBoxContainer.new()
- top.add_child(hp_row)
- var caption = label("ПРОЧНОСТЬ БАСТИОНА", 18, MUTED)
- caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
- hp_row.add_child(caption)
- hp_value = label("", 22)
- hp_row.add_child(hp_value)
- hp_meter = meter(MINT, 14)
- top.add_child(hp_meter)
+ var gear = button("", game.pause_run)
+ gear.name = "PauseButton"
+ gear.tooltip_text = "Пауза (P / Esc)"
+ gear.custom_minimum_size = Vector2(68, 68)
+ gear.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+ row.add_child(gear)
+ var gear_icon := Control.new()
+ gear_icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ gear_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+ gear_icon.draw.connect(draw_gear.bind(gear_icon))
+ gear.add_child(gear_icon)
  route_bar = Control.new()
- route_bar.custom_minimum_size.y = 40
+ route_bar.custom_minimum_size.y = 62
+ route_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
  route_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
  route_bar.draw.connect(draw_route)
- top.add_child(route_bar)
+ row.add_child(route_bar)
+ # Scrap purse, centred under the track.
+ var purse := HBoxContainer.new()
+ purse.alignment = BoxContainer.ALIGNMENT_CENTER
+ purse.add_theme_constant_override("separation", 10)
+ purse.custom_minimum_size.y = 44
+ top.add_child(purse)
+ var coin := Control.new()
+ coin.custom_minimum_size = Vector2(40, 40)
+ coin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+ coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+ coin.draw.connect(draw_coin.bind(coin))
+ purse.add_child(coin)
+ gold_label = label("0", 36)
+ purse.add_child(gold_label)
+ var hp_row := HBoxContainer.new()
+ top.add_child(hp_row)
+ status_label = label("", 18, GOLD)
+ status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+ hp_row.add_child(status_label)
+ hp_value = label("", 22)
+ hp_row.add_child(hp_value)
+ hp_meter = meter(Color("f0932b"), 13)
+ top.add_child(hp_meter)
  var slot := Control.new()
  slot.custom_minimum_size.y = 34
  slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -204,21 +229,86 @@ func draw_route() -> void:
  if not is_instance_valid(route_bar): return
  var font := route_bar.get_theme_default_font()
  var w: float = route_bar.size.x
- var end_x := w - 26.0
- var y := 32.0
+ var y := 26.0
+ var pad := 24.0
+ var span := maxf(60.0, w - pad * 2.0)
  var progress: float = game.route.progress()
- route_bar.draw_string(font, Vector2(0, 14), "ПУТЬ", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, MUTED)
- route_bar.draw_string(font, Vector2(0, 14), "%d / %d м" % [game.meters(), int(C.route_length() / C.UNITS_PER_METER)], HORIZONTAL_ALIGNMENT_RIGHT, w, 17, TEXT)
- route_bar.draw_line(Vector2(0, y), Vector2(end_x, y), Color("233345"), 6)
- route_bar.draw_line(Vector2(0, y), Vector2(end_x * progress, y), MINT, 6)
- for i in range(1, C.SEGMENTS.size()):
-  var reached := progress >= float(i) / C.SEGMENTS.size() - 0.001
-  route_bar.draw_circle(Vector2(end_x * i / C.SEGMENTS.size(), y), 7, MINT if reached else Color("3b5563"))
-  route_bar.draw_circle(Vector2(end_x * i / C.SEGMENTS.size(), y), 3, PANEL)
- route_bar.draw_colored_polygon(Art.ring(Vector2(w - 11, y), 10, 10, 6, PI / 6), Color("ff507e") if game.route.is_boss() else Color("7a3448"))
- var at := Vector2(end_x * progress, y)
- route_bar.draw_rect(Rect2(at + Vector2(-9, -13), Vector2(18, 9)), TEXT)
- route_bar.draw_rect(Rect2(at + Vector2(-4, -19), Vector2(8, 6)), MINT)
+ var count: int = C.SEGMENTS.size()
+ route_bar.draw_line(Vector2(pad, y), Vector2(pad + span, y), Color("6b5347"), 8)
+ route_bar.draw_line(Vector2(pad, y), Vector2(pad + span * progress, y), Color("f0932b"), 8)
+ route_bar.draw_circle(Vector2(pad, y), 7, Color("f5e9d2"))
+ for i in range(1, count):
+  route_badge(Vector2(pad + span * float(i) / count, y), "stop", progress >= float(i) / count - 0.001)
+ route_badge(Vector2(pad + span, y), "boss", game.route.is_boss())
+ route_badge(Vector2(pad + span * progress, y), "rider", true)
+ route_bar.draw_string(font, Vector2(0, 56), "%d / %d м" % [game.meters(), int(C.route_length() / C.UNITS_PER_METER)], HORIZONTAL_ALIGNMENT_CENTER, w, 16, Color("7a5a49"))
+
+# Track markers: a crate at every stop, a skull at the carrier, the bastion itself as the rider.
+func route_badge(center: Vector2, kind: String, active: bool) -> void:
+ var body := Color("f0932b") if active else Color("8a7366")
+ if kind == "rider":
+  route_bar.draw_rect(Rect2(center + Vector2(-11, -12), Vector2(22, 10)), Color("f5e9d2"))
+  route_bar.draw_rect(Rect2(center + Vector2(-7, -19), Vector2(9, 8)), Color("f5e9d2"))
+  route_bar.draw_circle(center + Vector2(-6, 0), 3.6, Color("e2622f"))
+  route_bar.draw_circle(center + Vector2(6, 0), 3.6, Color("e2622f"))
+  return
+ var rect := Rect2(center - Vector2(15, 15), Vector2(30, 30))
+ route_bar.draw_rect(rect, Color("4a2e22"))
+ route_bar.draw_rect(rect.grow(-3), body)
+ if kind == "stop":
+  route_bar.draw_rect(Rect2(center - Vector2(8, 7), Vector2(16, 14)), Color("f5e9d2"))
+  route_bar.draw_line(center + Vector2(-8, 0), center + Vector2(8, 0), Color("a98a63"), 2)
+ else:
+  route_bar.draw_circle(center + Vector2(0, -2), 8, Color("f5e9d2"))
+  route_bar.draw_rect(Rect2(center + Vector2(-5, 3), Vector2(10, 6)), Color("f5e9d2"))
+  route_bar.draw_circle(center + Vector2(-3, -3), 2.4, Color("3a241c"))
+  route_bar.draw_circle(center + Vector2(3, -3), 2.4, Color("3a241c"))
+
+func draw_gear(icon: Control) -> void:
+ var c := icon.size * 0.5
+ var r := minf(c.x, c.y) - 9.0
+ for i in range(8):
+  var a := TAU * i / 8.0
+  icon.draw_line(c + Vector2.from_angle(a) * (r - 3), c + Vector2.from_angle(a) * (r + 6), TEXT, 6)
+ icon.draw_circle(c, r, TEXT)
+ icon.draw_circle(c, r * 0.4, Color("3a241c"))
+
+func draw_bolt(icon: Control, tone: Color) -> void:
+ var c := icon.size * 0.5
+ var h := icon.size.y * 0.42
+ var w := icon.size.x * 0.36
+ var points := PackedVector2Array([c + Vector2(w * 0.3, -h), c + Vector2(-w, h * 0.1), c + Vector2(-w * 0.1, h * 0.1), c + Vector2(-w * 0.4, h), c + Vector2(w, -h * 0.15), c + Vector2(w * 0.05, -h * 0.15)])
+ icon.draw_colored_polygon(points, tone)
+ icon.draw_polyline(Art.closed(points), Color("15334a"), 2.0)
+
+# Card art: a grenade, a fire burst and a bullet salvo.
+func draw_ability(icon: Control, id: String) -> void:
+ var c := icon.size * 0.5
+ var r := minf(icon.size.x, icon.size.y) * 0.3
+ match id:
+  "grenade":
+   icon.draw_circle(c + Vector2(0, r * 0.2), r, Color("4d6b3a"))
+   icon.draw_circle(c + Vector2(-r * 0.3, -r * 0.1), r * 0.3, Color("6f9a4e"))
+   icon.draw_rect(Rect2(c + Vector2(-r * 0.28, -r * 1.35), Vector2(r * 0.56, r * 0.5)), Color("8a7a6d"))
+   icon.draw_line(c + Vector2(r * 0.2, -r * 1.2), c + Vector2(r * 0.95, -r * 1.5), Color("d8a860"), 4)
+  "burst":
+   for i in range(8):
+    var a := TAU * i / 8.0
+    icon.draw_line(c + Vector2.from_angle(a) * r * 0.7, c + Vector2.from_angle(a) * r * 1.5, Color("ffb03a"), 6)
+   icon.draw_circle(c, r * 0.85, Color("e2622f"))
+   icon.draw_circle(c, r * 0.5, Color("ffd98a"))
+  _:
+   for i in range(3):
+    var p := c + Vector2(-r * 0.9 + i * r * 0.9, r * 0.5 - i * r * 0.45)
+    icon.draw_colored_polygon(PackedVector2Array([p + Vector2(-r * 0.22, r * 0.42), p + Vector2(r * 0.22, r * 0.42), p + Vector2(r * 0.22, -r * 0.2), p, p + Vector2(-r * 0.22, -r * 0.2)]), Color("dff1ff"))
+    icon.draw_line(p + Vector2(0, r * 0.42), p + Vector2(0, r * 0.75), Color("8fd0f5"), 4)
+
+func draw_coin(icon: Control) -> void:
+ var c := icon.size * 0.5
+ var r := minf(c.x, c.y) - 3.0
+ icon.draw_circle(c, r, Color("b8721c"))
+ icon.draw_circle(c, r - 3.5, Color("f5b93c"))
+ icon.draw_circle(c + Vector2(-r * 0.28, -r * 0.28), r * 0.28, Color("ffe9a8"))
 
 func flash_note(text: String) -> void:
  note = text
@@ -230,18 +320,20 @@ func update_hud() -> void:
  hp_meter.max_value = game.max_hp
  hp_meter.value = game.hp
  hp_meter.modulate = Color(1, 0.55, 0.55) if game.hit_flash > 0 else Color.WHITE
+ gold_label.text = str(game.gold)
  var building: bool = game.state == game.State.BUILD or (game.state == game.State.PAUSED and game.paused_from == game.State.BUILD)
+ var sub := ""
  if building:
   if game.stop == 0: status_label.text = "ДЕПО  ·  ПОДГОТОВКА"
   elif game.stop == C.SEGMENTS.size(): status_label.text = "ОСТАНОВКА %d  ·  ПЕРЕД БОССОМ" % game.stop
   else: status_label.text = "ОСТАНОВКА %d / %d" % [game.stop, C.SEGMENTS.size()]
-  status_sub.text = "Достройка  ·  бой заморожен"
+  sub = "Достройка  ·  бой заморожен"
  elif game.route.is_boss():
   status_label.text = "ПУТЬ ПЕРЕКРЫТ"
-  status_sub.text = "Уничтожьте Носителя"
+  sub = "Уничтожьте Носителя"
  else:
   status_label.text = "УЧАСТОК %d / %d" % [game.route.stage, C.SEGMENTS.size()]
-  status_sub.text = "В пути  ·  остановка через %d с" % ceili(maxf(0, C.SEGMENT_SECONDS - game.route.clock))
+  sub = "В пути  ·  остановка через %d с" % ceili(maxf(0, C.SEGMENT_SECONDS - game.route.clock))
  route_bar.queue_redraw()
  var boss_alive: bool = game.boss != null and game.boss.hp > 0
  boss_box.visible = boss_alive
@@ -251,7 +343,7 @@ func update_hud() -> void:
   boss_meter.value = game.boss.hp
   boss_caption.text = "НОСИТЕЛЬ  ·  ПРИЗЫВ ПОДКРЕПЛЕНИЯ!" if game.boss.warn > 0 else "НОСИТЕЛЬ  ·  %d / %d" % [ceili(game.boss.hp), int(game.boss.max_hp)]
  elif game.clock < note_until: event_label.text = note
- else: event_label.text = "Бастион: " + tower_summary()
+ else: event_label.text = sub
  if is_instance_valid(kills_value): update_console()
 
 func show_hud() -> void:
@@ -262,7 +354,7 @@ func show_hud() -> void:
 
 func panel_back() -> void:
  var back := Panel.new()
- back.add_theme_stylebox_override("panel", strip(Color(0.035, 0.07, 0.115, 0.97), true))
+ back.add_theme_stylebox_override("panel", strip(Color(0.13, 0.22, 0.32, 0.97), true))
  back.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
  back.offset_left = -safe.x
  back.offset_right = safe.z
@@ -272,7 +364,7 @@ func panel_back() -> void:
 
 func tile(parent: Control, caption: String) -> Label:
  var panel := PanelContainer.new()
- var style := box(Color("101e2b"), Color("29404b"), 12)
+ var style := box(Color("1b3448"), Color("39627f"), 12)
  style.content_margin_top = 8
  style.content_margin_bottom = 8
  style.content_margin_left = 14
@@ -296,7 +388,62 @@ func build_console() -> void:
  body.offset_top = -C.PANEL_HEIGHT + 14
  surface.add_child(body)
  panel_root = body
- body.add_child(label("БОЙ  ·  АВТОНАВЕДЕНИЕ КАЖДОГО СТВОЛА", 20, MINT))
+ # Energy on the left, ability cards next to it — the reference bottom bar.
+ var deck := HBoxContainer.new()
+ deck.add_theme_constant_override("separation", 12)
+ deck.custom_minimum_size.y = 126
+ body.add_child(deck)
+ var purse := PanelContainer.new()
+ var purse_style := box(Color("2c6ea6"), Color("8fd0f5"), 18)
+ purse_style.content_margin_left = 12
+ purse_style.content_margin_right = 12
+ purse_style.content_margin_top = 10
+ purse_style.content_margin_bottom = 10
+ purse.add_theme_stylebox_override("panel", purse_style)
+ purse.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+ deck.add_child(purse)
+ var purse_row := HBoxContainer.new()
+ purse_row.add_theme_constant_override("separation", 6)
+ purse_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+ purse.add_child(purse_row)
+ var bolt := Control.new()
+ bolt.custom_minimum_size = Vector2(34, 46)
+ bolt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+ bolt.draw.connect(draw_bolt.bind(bolt, Color("bfe8ff")))
+ purse_row.add_child(bolt)
+ energy_label = label("0", 34)
+ purse_row.add_child(energy_label)
+ ability_cards.clear()
+ for i in range(C.ABILITIES.size()):
+  var card: Dictionary = C.ABILITIES[i]
+  var slot = column(2)
+  slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+  deck.add_child(slot)
+  var press = button("", game.use_ability.bind(i))
+  press.name = "Ability_%d_%s" % [i, card.id]
+  press.tooltip_text = "%s — %s" % [card.name, card.text]
+  press.custom_minimum_size.y = 88
+  press.add_theme_stylebox_override("normal", box(Color("2f7fc0"), Color("9fdcff"), 18))
+  press.add_theme_stylebox_override("hover", box(Color("3f93d6"), Color("d6f2ff"), 18))
+  press.add_theme_stylebox_override("pressed", box(Color("1f5c8f"), Color("9fdcff"), 18))
+  press.add_theme_stylebox_override("disabled", box(Color("32536e"), Color("4d7590"), 18))
+  slot.add_child(press)
+  var icon := Control.new()
+  icon.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+  icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+  icon.draw.connect(draw_ability.bind(icon, String(card.id)))
+  press.add_child(icon)
+  var cost := HBoxContainer.new()
+  cost.alignment = BoxContainer.ALIGNMENT_CENTER
+  cost.add_theme_constant_override("separation", 3)
+  slot.add_child(cost)
+  var mark := Control.new()
+  mark.custom_minimum_size = Vector2(18, 24)
+  mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+  mark.draw.connect(draw_bolt.bind(mark, Color("bfe8ff")))
+  cost.add_child(mark)
+  cost.add_child(label(str(card.cost), 22))
+  ability_cards.append({"button": press, "index": i})
  var row := HBoxContainer.new()
  row.add_theme_constant_override("separation", 12)
  body.add_child(row)
@@ -338,6 +485,10 @@ func build_console() -> void:
  body.add_child(tip_label)
 
 func update_console() -> void:
+ if is_instance_valid(energy_label):
+  energy_label.text = str(int(game.energy))
+  for card in ability_cards:
+   if is_instance_valid(card.button): card.button.disabled = not game.can_use(card.index)
  kills_value.text = str(game.kills)
  if game.route.is_boss() and game.boss != null:
   clock_caption.text = "НОСИТЕЛЬ"

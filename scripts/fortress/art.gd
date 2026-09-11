@@ -1,11 +1,25 @@
 extends RefCounted
 # Shared vector art of the fortress: blocks, turrets and reward icons, drawn on any CanvasItem.
 const C = preload("res://scripts/fortress/config.gd")
+# Warm wasteland palette: hazy daylight over a rusted city, cream crates on the tower.
+const SKY_HIGH = Color("8e8880")
+const SKY_LOW = Color("cdbead")
+const CITY_FAR = Color("b0a49b")
+const CITY_MID = Color("9a8a82")
+const CITY_NEAR = Color("7d6a63")
+const ROAD = Color("9c5340")
+const ROAD_DARK = Color("6d3a2d")
+const SOIL = Color("53291f")
+const CRATE = Color("e8d6b6")
+const CRATE_DARK = Color("c4a985")
+const CRATE_INNER = Color("8d4f3c")
+const STEEL = Color("6b5f58")
+const RUST = Color("e2622f")
 const MINT = Color("78efce")
 const ICE = Color("71dfff")
 const AMBER = Color("f9db8b")
 const VIOLET = Color("b89aff")
-const EDGE = Color("09131b")
+const EDGE = Color("3a241c")
 
 static func fade(color: Color, alpha: float) -> Color:
  return Color(color.r, color.g, color.b, color.a * alpha)
@@ -35,43 +49,38 @@ static func links_in(cells, cell: Vector2i) -> int:
  if cells.has(cell + Vector2i(0, -1)): links |= 8
  return links
 
+# A cream crate: light frame around a dark recess where the gun sits.
 static func draw_block(ci: CanvasItem, rect: Rect2, links: int, armed: bool, alpha: float = 1.0, tint: Color = Color.WHITE) -> void:
  var k := rect.size.x / C.CELL
- var bevel := 6.0 * k
- ci.draw_rect(rect, fade(Color("243c4d") * tint, alpha))
- if (links & 4) == 0: ci.draw_rect(Rect2(rect.position, Vector2(rect.size.x, bevel)), fade(Color("3b6073") * tint, alpha))
- if (links & 8) == 0: ci.draw_rect(Rect2(rect.position.x, rect.end.y - bevel, rect.size.x, bevel), fade(Color("15242f") * tint, alpha))
- if (links & 2) == 0: ci.draw_rect(Rect2(rect.position, Vector2(bevel * 0.7, rect.size.y)), fade(Color("30505f") * tint, alpha))
- if (links & 1) == 0: ci.draw_rect(Rect2(rect.end.x - bevel * 0.7, rect.position.y, bevel * 0.7, rect.size.y), fade(Color("192b37") * tint, alpha))
- var inner := rect.grow(-rect.size.x * 0.17)
- ci.draw_rect(inner, fade(Color("1b2e3c") * tint, alpha))
- var brace := fade(Color("2e4b5d") * tint, alpha)
- ci.draw_line(inner.position, inner.end, brace, 3.0 * k)
- ci.draw_line(Vector2(inner.end.x, inner.position.y), Vector2(inner.position.x, inner.end.y), brace, 3.0 * k)
- ci.draw_rect(inner, fade(Color("365869") * tint, alpha), false, 1.5 * k)
- for corner in [Vector2(0.1, 0.1), Vector2(0.9, 0.1), Vector2(0.1, 0.9), Vector2(0.9, 0.9)]:
-  ci.draw_circle(rect.position + rect.size * corner, 2.2 * k, fade(Color("7fa3aa") * tint, alpha))
- ci.draw_rect(Rect2(rect.get_center().x - 9 * k, rect.end.y - 11 * k, 18 * k, 3 * k), fade(MINT if armed else Color("2c4a4c"), alpha))
+ var frame := 9.0 * k
+ ci.draw_rect(rect, fade(CRATE * tint, alpha))
+ var inner := Rect2(rect.position + Vector2(frame, frame), rect.size - Vector2(frame, frame) * 2.0)
+ ci.draw_rect(inner, fade(CRATE_INNER * tint, alpha))
+ ci.draw_rect(Rect2(inner.position, Vector2(inner.size.x, 4.0 * k)), fade(Color("6d3729") * tint, alpha))
+ # Plank shading on the frame and a lip under the floor above.
+ ci.draw_rect(Rect2(rect.position.x, rect.end.y - frame, rect.size.x, frame), fade(CRATE_DARK * tint, alpha))
+ if (links & 4) == 0: ci.draw_rect(Rect2(rect.position, Vector2(rect.size.x, 3.0 * k)), fade(Color("f5e9d2") * tint, alpha))
+ for corner in [Vector2(0.07, 0.09), Vector2(0.93, 0.09), Vector2(0.07, 0.91), Vector2(0.93, 0.91)]:
+  ci.draw_circle(rect.position + rect.size * corner, 2.6 * k, fade(Color("a98a63") * tint, alpha))
+ if armed: ci.draw_rect(Rect2(rect.position.x + frame, rect.end.y - frame - 3.0 * k, 14.0 * k, 3.0 * k), fade(RUST, alpha))
  var edge := fade(EDGE, alpha)
- if (links & 4) == 0: ci.draw_line(rect.position, Vector2(rect.end.x, rect.position.y), edge, 3.0 * k)
- if (links & 8) == 0: ci.draw_line(Vector2(rect.position.x, rect.end.y), rect.end, edge, 3.0 * k)
- if (links & 2) == 0: ci.draw_line(rect.position, Vector2(rect.position.x, rect.end.y), edge, 3.0 * k)
- if (links & 1) == 0: ci.draw_line(Vector2(rect.end.x, rect.position.y), rect.end, edge, 3.0 * k)
+ ci.draw_rect(rect, edge, false, 2.6 * k)
+ ci.draw_rect(inner, fade(Color("4d2419") * tint, alpha), false, 2.0 * k)
 
 static func draw_turret(ci: CanvasItem, kind: String, pivot: Vector2, aim: float, t: float, recoil: float = 0.0, s: float = 1.0, alpha: float = 1.0) -> void:
  match kind:
   "mg":
-   ci.draw_colored_polygon(PackedVector2Array([pivot + Vector2(-19, 16) * s, pivot + Vector2(19, 16) * s, pivot + Vector2(13, 2) * s, pivot + Vector2(-13, 2) * s]), fade(Color("2e4654"), alpha))
+   ci.draw_colored_polygon(PackedVector2Array([pivot + Vector2(-19, 16) * s, pivot + Vector2(19, 16) * s, pivot + Vector2(13, 2) * s, pivot + Vector2(-13, 2) * s]), fade(Color("4b3f39"), alpha))
    var back := -recoil * 45.0
    var housing := quad(pivot, aim, s, Rect2(-12, -9, 26, 18))
-   ci.draw_colored_polygon(housing, fade(Color("5b7a86"), alpha))
+   ci.draw_colored_polygon(housing, fade(Color("8a7a6d"), alpha))
    ci.draw_polyline(closed(housing), fade(EDGE, alpha), 2.0 * s)
    for y in [-6.0, 2.0]:
-    ci.draw_colored_polygon(quad(pivot, aim, s, Rect2(12 + back, y, 20, 4)), fade(Color("c9d6cf"), alpha))
+    ci.draw_colored_polygon(quad(pivot, aim, s, Rect2(12 + back, y, 20, 4)), fade(Color("ddd2c4"), alpha))
    var drum := pivot + Vector2(-3, 5).rotated(aim) * s
-   ci.draw_circle(drum, 5.0 * s, fade(Color("3b5560"), alpha))
+   ci.draw_circle(drum, 5.0 * s, fade(Color("5c4c42"), alpha))
    ci.draw_circle(drum, 2.0 * s, fade(AMBER, alpha))
-   ci.draw_circle(pivot, 3.0 * s, fade(Color("9fb8bd"), alpha))
+   ci.draw_circle(pivot, 3.0 * s, fade(Color("b6a695"), alpha))
   "cryo":
    var base := ring(pivot + Vector2(0, 8) * s, 19 * s, 13 * s, 6, PI / 6)
    ci.draw_colored_polygon(base, fade(Color("1d4f60"), alpha))

@@ -23,7 +23,7 @@ func step(dt: float, game) -> void:
   if target == null: continue
   turret.aim = (target.pos - turret.pivot).angle()
   if turret.cooldown > 0: continue
-  turret.cooldown = 1.0 / turret.stats.rate
+  turret.cooldown = 1.0 / turret.stats.rate * (0.5 if game.rapid_left > 0 else 1.0)
   turret.recoil = 0.09
   turret.shots += 1
   match turret.kind:
@@ -38,9 +38,15 @@ func step(dt: float, game) -> void:
    projectiles.remove_at(i)
    cryo_explode(game, shell.to)
 
+# Floating damage numbers over the target, rate limited per enemy.
+func note_damage(game, enemy, dealt: float) -> void:
+ if enemy.number_cd > 0 or dealt <= 0: return
+ enemy.number_cd = 0.4
+ game.add_effect("damage", enemy.pos + Vector2(6, -enemy.stats.size - 10), Vector2.ZERO, Color("ffe9a8"), 0.8, dealt)
+
 func fire_mg(game, turret, target) -> void:
  var from: Vector2 = turret.muzzle()
- target.hit(turret.stats.damage)
+ note_damage(game, target, target.hit(turret.stats.damage))
  game.add_effect("shot", from, target.pos, Color("f9db8b"), 0.08)
  game.add_effect("flash", from, from, Color("ffe7a8"), 0.07, 9)
  game.add_effect("hit", target.pos, target.pos, Color("ffd9a5"), 0.16, 8)
@@ -65,7 +71,7 @@ func cryo_explode(game, at: Vector2) -> Array:
  var hits := []
  for enemy in game.enemies:
   if enemy.hp > 0 and enemy.pos.distance_to(at) <= stats.radius + enemy.stats.size * 0.5:
-   enemy.hit(stats.damage)
+   note_damage(game, enemy, enemy.hit(stats.damage))
    enemy.slow = maxf(enemy.slow, stats.slow)
    hits.append(enemy)
  game.add_effect("ice", at, at, Color("6fe0ff"), 0.5, stats.radius)
@@ -82,7 +88,7 @@ func fire_tesla(game, turret, first) -> Array:
   if target == null: break
   visited.append(target)
   var chilled: bool = target.slow > 0
-  target.hit(stats.damage * (stats.slowed_bonus if chilled else 1.0))
+  note_damage(game, target, target.hit(stats.damage * (stats.slowed_bonus if chilled else 1.0)))
   var color := Color("b9fff5") if chilled else Color("b89aff")
   game.add_effect("bolt", origin, target.pos, color, 0.22)
   if chilled: game.add_effect("conduct", target.pos, target.pos, color, 0.6)
