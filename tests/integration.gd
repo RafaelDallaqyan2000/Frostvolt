@@ -35,8 +35,10 @@ func run() -> void:
  game.weapons.projectiles.append({"pos": game.center, "destination": enemy.pos, "life": 2.0})
  game.add_effect("hit", enemy.pos, enemy.pos, Color.WHITE, 1)
  game.pause_run()
+ var animation_snapshot = [enemy.motion_clock, enemy.age, enemy.lunge, enemy.recoil, game.weapons.kick, game.impact_shake, game.damage_glow]
  var snapshot = [enemy.pos, enemy.hp, game.tower.hp, game.waves.elapsed, game.elapsed, game.weapons.projectiles[0].pos, game.effects[0].left]
  for i in range(180): game.advance(1.0 / 60)
+ check(animation_snapshot == [enemy.motion_clock, enemy.age, enemy.lunge, enemy.recoil, game.weapons.kick, game.impact_shake, game.damage_glow], "Pause freezes creature and weapon animation clocks")
  check(snapshot == [enemy.pos, enemy.hp, game.tower.hp, game.waves.elapsed, game.elapsed, game.weapons.projectiles[0].pos, game.effects[0].left], "Pause freezes every simulation subsystem")
  game.resume_run()
  check(game.state == Game.State.RUNNING, "Resume")

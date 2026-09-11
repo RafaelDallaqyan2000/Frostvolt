@@ -29,6 +29,8 @@ var sound
 var ui
 var arena
 var test_mode := false
+var impact_shake := 0.0
+var damage_glow := 0.0
 
 func _ready() -> void:
  rng.randomize()
@@ -54,6 +56,9 @@ func resize() -> void:
 
 func start_run() -> void:
  sound.stop_all()
+ arena.reset_visuals()
+ impact_shake = 0
+ damage_glow = 0
  enemies.clear()
  effects.clear()
  offered.clear()
@@ -78,11 +83,17 @@ func _process(dt: float) -> void:
 func advance(dt: float) -> void:
  if state != State.RUNNING: return
  elapsed += dt
+ impact_shake = maxf(0, impact_shake - dt * 5)
+ damage_glow = maxf(0, damage_glow - dt * 3)
+ var hp_before: float = tower.hp
  # Only this method advances simulation. UI animation remains independent.
  var wave_finished: bool = waves.step(dt, self)
  weapons.step(dt, self)
  for enemy in enemies:
   if enemy.hp > 0: enemy.step(dt, center, tower)
+ if tower.hp < hp_before:
+  impact_shake = 1.0
+  damage_glow = 1.0
  for i in range(enemies.size() - 1, -1, -1):
   var enemy = enemies[i]
   if enemy.hp <= 0:
@@ -111,6 +122,7 @@ func spawn_enemy(kind: String, position: Vector2 = Vector2.INF):
    2: position = Vector2(lerpf(arena_rect.position.x, arena_rect.end.x, along), arena_rect.position.y)
    3: position = Vector2(lerpf(arena_rect.position.x, arena_rect.end.x, along), arena_rect.end.y)
  var enemy = Enemy.new(kind, position, waves.number)
+ enemy.facing = (center - position).angle() + PI / 2.0
  enemies.append(enemy)
  return enemy
 
@@ -150,6 +162,7 @@ func next_wave() -> void:
   for i in range(4): spawn_enemy("normal")
  save_records()
  sound.play_sound("upgrade")
+ add_effect("upgrade", center, center, Color("86ffcc"), 1.0, 175)
  ui.show_hud()
  ui.announce("ВОЛНА %02d" % waves.number, "Носитель. Уничтожьте ядро." if waves.number == 10 else "Периметр снова открыт")
 
@@ -168,6 +181,9 @@ func resume_run() -> void:
 func to_menu() -> void:
  save_records()
  state = State.MENU
+ arena.reset_visuals()
+ impact_shake = 0
+ damage_glow = 0
  enemies.clear()
  effects.clear()
  weapons.projectiles.clear()
